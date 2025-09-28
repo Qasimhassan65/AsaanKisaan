@@ -60,26 +60,35 @@ fun CropAnalyticsScreen(
     var trendColor by remember { mutableStateOf(Color.White) }
     var currentLocation by remember { mutableStateOf("Lahore") }
     var isLoading by remember { mutableStateOf(true) }
+    var weeklyData by remember { mutableStateOf<List<PricePoint>>(emptyList()) }
+    var useCurveEnhanced by remember { mutableStateOf(true) }
     
     // Get crop info
     val cropInfo = AVAILABLE_CROPS.find { it.name == cropName } ?: AVAILABLE_CROPS[0]
     val cropIcon = cropInfo.icon
     
-    LaunchedEffect(cropName, userLatitude, userLongitude) {
+    LaunchedEffect(cropName, userLatitude, userLongitude, useCurveEnhanced) {
         coroutineScope.launch {
             isLoading = true
             repository.loadCropData()
             currentLocation = repository.getClosestLocation(userLatitude, userLongitude)
             
-            // Get price history for the crop and location
-            val priceHistory = repository.getPriceHistoryForCropAndLocation(cropName, currentLocation)
+            // Get current year data
+            val (currentWeek, currentYear) = repository.getCurrentWeekAndYear()
             
-            // Convert to chart data (limit to last 50 points for performance)
-            chartData = priceHistory.takeLast(50).map { 
-                PricePoint(it.date, it.price, it.basePrice, it.inflationRate) 
+            // Get curve-enhanced data for the current year
+            chartData = if (useCurveEnhanced) {
+                repository.getCurveEnhancedData(cropName, currentLocation, currentYear)
+            } else {
+                repository.getNormalizedYearData(cropName, currentLocation, currentYear)
             }
             
-            // Get recent history for display
+            // Get weekly data for previous, current, and next week (for the price display)
+            val rawWeeklyData = repository.getWeeklyData(cropName, currentLocation, currentWeek, currentYear)
+            weeklyData = rawWeeklyData
+            
+            // Get recent history for display (show actual prices, not normalized)
+            val priceHistory = repository.getPriceHistoryForCropAndLocation(cropName, currentLocation)
             historyData = priceHistory.takeLast(10).map { 
                 HistoryItem(it.date, "PKR ${String.format("%.0f", it.price)}") 
             }.reversed()
@@ -113,32 +122,32 @@ fun CropAnalyticsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(brush = gradientBrush)
-            .padding(16.dp)
-    ) {
-        // Header
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Header
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
                 .height(60.dp)
                 .clip(RoundedCornerShape(30.dp)),
             colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0x80 / 255f)),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClicked) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBackClicked) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
                         tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -156,16 +165,16 @@ fun CropAnalyticsScreen(
                 }
                 
                 IconButton(onClick = { /* TODO: Handle info */ }) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Info",
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info",
                         tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
-        }
-        
+
         Spacer(modifier = Modifier.height(24.dp))
         
         if (isLoading) {
@@ -200,14 +209,14 @@ fun CropAnalyticsScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = cropIcon,
+                    Text(
+                        text = cropIcon,
                             fontSize = 32.sp
-                        )
+                    )
                     }
                     
                     Spacer(modifier = Modifier.width(20.dp))
-                    
+
                     // Price Info
                     Column(
                         modifier = Modifier.weight(1f)
@@ -224,7 +233,7 @@ fun CropAnalyticsScreen(
                             fontSize = 16.sp
                         )
                     }
-                    
+
                     // Trend Indicator
                     Text(
                         text = trendIcon,
@@ -234,9 +243,9 @@ fun CropAnalyticsScreen(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             // Price Chart
             Card(
                 modifier = Modifier
@@ -250,23 +259,86 @@ fun CropAnalyticsScreen(
                         .fillMaxSize()
                         .padding(20.dp)
                 ) {
-                    Text(
-                        text = "Price Trend (Last 50 Weeks)",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (useCurveEnhanced) {
+                                "Current Year Price Trend (Curve Enhanced)"
+                            } else {
+                                "Current Year Price Trend (Normalized)"
+                            },
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        // Toggle button for curve visualization
+                        Card(
+                            modifier = Modifier.clickable { useCurveEnhanced = !useCurveEnhanced },
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.2f)),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text(
+                                text = if (useCurveEnhanced) "Curves" else "Lines",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    if (chartData.isNotEmpty()) {
-                        PriceChart(
-                            data = chartData,
-                            modifier = Modifier
+                if (chartData.isNotEmpty()) {
+                    PriceChart(
+                        data = chartData,
+                        modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
                         )
-                    } else {
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Show actual prices for current year
+                        Text(
+                            text = "Current Year Prices (Predicted):",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Display actual prices for current year (sample weeks)
+                        val (_, currentYear) = repository.getCurrentWeekAndYear()
+                        val actualYearData = repository.getCurrentYearData(cropName, currentLocation, currentYear)
+                        
+                        // Show every 4th week for readability
+                        actualYearData.filterIndexed { index, _ -> index % 4 == 0 || index == actualYearData.size - 1 }
+                            .take(8) // Limit to 8 entries
+                            .forEach { weekData ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = weekData.date,
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "PKR ${String.format("%.0f", weekData.price)}",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                } else {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -282,9 +354,9 @@ fun CropAnalyticsScreen(
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             // Recent History
             Card(
                 modifier = Modifier
@@ -367,80 +439,143 @@ fun PriceChart(
         val maxPrice = data.maxOf { it.price }
         val priceRange = maxPrice - minPrice
         
-        val stepX = (canvasWidth - 2 * padding) / (data.size - 1)
+        val stepX = if (data.size > 1) (canvasWidth - 2 * padding) / (data.size - 1) else 0f
         
-        // Create path for the line
-        val path = Path()
+        // Calculate points
+        val points = data.mapIndexed { index, point ->
+            val x = padding + index * stepX
+            val y = if (priceRange > 0) {
+                canvasHeight - padding - ((point.price - minPrice) / priceRange) * (canvasHeight - 2 * padding)
+            } else {
+                canvasHeight / 2
+            }
+            Offset(x.toFloat(), y.toFloat())
+        }
+        
+        // Create smooth curve using cubic bezier
+        val curvePath = Path()
         val fillPath = Path()
         
-        data.forEachIndexed { index, point ->
-            val x = padding + index * stepX
-            val y = canvasHeight - padding - ((point.price - minPrice) / priceRange) * (canvasHeight - 2 * padding)
+        if (points.isNotEmpty()) {
+            curvePath.moveTo(points[0].x, points[0].y)
+            fillPath.moveTo(points[0].x, canvasHeight - padding)
+            fillPath.lineTo(points[0].x, points[0].y)
             
-            if (index == 0) {
-                path.moveTo(x.toFloat(), y.toFloat())
-                fillPath.moveTo(x.toFloat(), (canvasHeight - padding).toFloat())
-                fillPath.lineTo(x.toFloat(), y.toFloat())
-            } else {
-                path.lineTo(x.toFloat(), y.toFloat())
-                fillPath.lineTo(x.toFloat(), y.toFloat())
+            for (i in 1 until points.size) {
+                val prevPoint = points[i - 1]
+                val currentPoint = points[i]
+                
+                // Calculate control points for smooth curves with enhanced curvature
+                val midX = (prevPoint.x + currentPoint.x) / 2
+                val midY = (prevPoint.y + currentPoint.y) / 2
+                
+                // Enhanced control points for more dramatic curves
+                val curvatureFactor = 0.4f
+                val controlPoint1X = prevPoint.x + (currentPoint.x - prevPoint.x) * curvatureFactor
+                val controlPoint1Y = prevPoint.y + (currentPoint.y - prevPoint.y) * curvatureFactor + 
+                    kotlin.math.sin(i * 0.5f) * 20f // Add wave component
+                val controlPoint2X = currentPoint.x - (currentPoint.x - prevPoint.x) * curvatureFactor
+                val controlPoint2Y = currentPoint.y - (currentPoint.y - prevPoint.y) * curvatureFactor + 
+                    kotlin.math.cos(i * 0.5f) * 15f // Add wave component
+                
+                curvePath.cubicTo(
+                    controlPoint1X, controlPoint1Y,
+                    controlPoint2X, controlPoint2Y,
+                    currentPoint.x, currentPoint.y
+                )
+                
+                fillPath.cubicTo(
+                    controlPoint1X, controlPoint1Y,
+                    controlPoint2X, controlPoint2Y,
+                    currentPoint.x, currentPoint.y
+                )
             }
+            
+            fillPath.lineTo(points.last().x, canvasHeight - padding)
+            fillPath.close()
         }
         
-        fillPath.lineTo((canvasWidth - padding).toFloat(), (canvasHeight - padding).toFloat())
-        fillPath.close()
-        
-        // Draw filled area
+        // Draw filled area with gradient
         drawPath(
             path = fillPath,
-            color = Color.White.copy(alpha = 0.2f)
+            color = Color.White.copy(alpha = 0.15f)
         )
         
-        // Draw line
+        // Draw main curve
         drawPath(
-            path = path,
+            path = curvePath,
             color = Color.White,
             style = Stroke(
-                width = 3.dp.toPx(),
-                cap = StrokeCap.Round
+                width = 4.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round
             )
         )
         
-        // Draw data points
-        data.forEachIndexed { index, point ->
-            val x = padding + index * stepX
-            val y = canvasHeight - padding - ((point.price - minPrice) / priceRange) * (canvasHeight - 2 * padding)
+        // Draw data points with different sizes
+        points.forEachIndexed { index, point ->
+            val radius = if (index == 0 || index == points.size - 1) 6.dp.toPx() else 4.dp.toPx()
+            val alpha = if (index == 0 || index == points.size - 1) 1f else 0.8f
             
             drawCircle(
+                color = Color.White.copy(alpha = alpha),
+                radius = radius,
+                center = point
+            )
+            
+            // Add inner circle for emphasis
+            drawCircle(
                 color = Color.White,
-                radius = 4.dp.toPx(),
-                center = Offset(x.toFloat(), y.toFloat())
+                radius = radius * 0.5f,
+                center = point
             )
         }
         
-        // Draw price labels
+        // Draw labels
         drawIntoCanvas { canvas ->
             val paint = Paint().apply {
                 color = android.graphics.Color.WHITE
-                textSize = 24.sp.toPx()
+                textSize = 14.sp.toPx()
                 textAlign = Paint.Align.CENTER
             }
             
-            // Min price
+            // Y-axis labels
             canvas.nativeCanvas.drawText(
-                String.format("%.0f", minPrice),
+                "Low",
                 padding.toFloat(),
-                canvasHeight - padding + 30.dp.toPx(),
+                canvasHeight - padding + 25.dp.toPx(),
                 paint
             )
             
-            // Max price
             canvas.nativeCanvas.drawText(
-                String.format("%.0f", maxPrice),
+                "High",
                 padding.toFloat(),
-                padding + 20.dp.toPx(),
+                padding + 15.dp.toPx(),
                 paint
             )
+            
+            // X-axis labels (show every few weeks for readability)
+            val weekLabelPaint = Paint().apply {
+                color = android.graphics.Color.WHITE
+                textSize = 10.sp.toPx()
+                textAlign = Paint.Align.CENTER
+            }
+            
+            val labelInterval = maxOf(1, data.size / 8) // Show max 8 labels
+            
+            data.forEachIndexed { index, point ->
+                if (index % labelInterval == 0 || index == data.size - 1) {
+                    val x = padding + index * stepX
+                    val weekNumber = point.date.replace("Week ", "").toIntOrNull() ?: (index + 1)
+                    
+                    canvas.nativeCanvas.drawText(
+                        "W$weekNumber",
+                        x,
+                        canvasHeight - padding + 35.dp.toPx(),
+                        weekLabelPaint
+                    )
+                }
+            }
         }
     }
 }

@@ -57,7 +57,8 @@ import androidx.compose.ui.res.stringResource // Import for string resources
 fun HomeScreen(
     onNavigateToDiseaseDetection: () -> Unit,
     onLanguageSelected: (String) -> Unit, // New language selection callback
-    currentLanguage: String // Current language code (e.g., "en", "ur")
+    currentLanguage: String, // Current language code (e.g., "en", "ur")
+    onNavigateToCropPrices: () -> Unit // New navigation callback for crop prices
 ) {
     val gradientColors = listOf(
         LightGreen, // Light green
@@ -342,7 +343,9 @@ fun HomeScreen(
             
             // Favorite Crops Prices Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onNavigateToCropPrices), // Added clickable modifier
                 colors = CardDefaults.cardColors(
                     containerColor = Color.White.copy(alpha = 0.3f)
                 ),
@@ -559,7 +562,8 @@ fun HomeScreenPreview() {
         HomeScreen(
             onNavigateToDiseaseDetection = {},
             onLanguageSelected = {},
-            currentLanguage = "en"
+            currentLanguage = "en",
+            onNavigateToCropPrices = {} // Provide a placeholder lambda for preview
         )
     }
 }

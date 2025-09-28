@@ -24,8 +24,12 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.asaankisaan.ui.homescreen.HomeScreen
 import com.example.asaankisaan.ui.diseasedetection.DiseaseDetectionScreen
+import com.example.asaankisaan.ui.cropprices.CropPricesScreen
+import com.example.asaankisaan.ui.cropprices.CropAnalyticsScreen
 import com.example.asaankisaan.ui.theme.AsaanKisaanTheme
 import java.util.Locale
 
@@ -34,19 +38,21 @@ class MainActivity : ComponentActivity() {
     private val PREFS_NAME = "AsaanKisaanPrefs"
     private val LANGUAGE_KEY = "app_language"
 
-    // Utility function to save the language preference
+    // Save language preference
     private fun saveLanguagePreference(context: Context, langCode: String) {
-        val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs: SharedPreferences =
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(LANGUAGE_KEY, langCode).apply()
     }
 
-    // Utility function to get the language preference, default to English
+    // Get language preference (default = English)
     private fun getLanguagePreference(context: Context): String {
-        val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs: SharedPreferences =
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getString(LANGUAGE_KEY, "en") ?: "en"
     }
 
-    // Utility function to set the app's locale
+    // Set app locale
     private fun setAppLocale(context: Context, languageCode: String) {
         val locale = Locale(languageCode)
         Locale.setDefault(locale)
@@ -55,24 +61,25 @@ class MainActivity : ComponentActivity() {
         config.setLocale(locale)
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
 
-        // Update the context of the activity itself
+        // Update activity context
         val activityContext = (context as? ComponentActivity)?.baseContext ?: context
         val newConfig = Configuration(activityContext.resources.configuration)
         newConfig.setLocale(locale)
-        activityContext.resources.updateConfiguration(newConfig, activityContext.resources.displayMetrics)
+        activityContext.resources.updateConfiguration(
+            newConfig,
+            activityContext.resources.displayMetrics
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Apply the saved language preference BEFORE setContent
+        // Apply saved language preference BEFORE setContent
         val savedLanguage = getLanguagePreference(this)
         setAppLocale(this, savedLanguage)
 
         setContent {
-            // Re-apply locale in compose content as a workaround for some issues with configuration changes
-            // In a real app, you might use a more robust way to handle this, e.g., a custom ContextWrapper or ViewModel
             val currentContext = LocalContext.current
             LaunchedEffect(savedLanguage) {
                 setAppLocale(currentContext, savedLanguage)
@@ -94,15 +101,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }.toTypedArray()
 
-                val requestPermissionLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestMultiplePermissions()
-                ) { permissions: Map<String, Boolean> ->
-                    allPermissionsGranted = permissions.entries.all { it.value }
-                }
+                val requestPermissionLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestMultiplePermissions()
+                    ) { permissions: Map<String, Boolean> ->
+                        allPermissionsGranted = permissions.entries.all { it.value }
+                    }
 
                 LaunchedEffect(Unit) {
                     val currentPermissions = permissionsToRequest.all {
-                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                        ContextCompat.checkSelfPermission(context, it) ==
+                                PackageManager.PERMISSION_GRANTED
                     }
 
                     if (currentPermissions) {
@@ -115,22 +124,52 @@ class MainActivity : ComponentActivity() {
                 val onLanguageSelected: (String) -> Unit = { langCode ->
                     saveLanguagePreference(context, langCode)
                     setAppLocale(context, langCode)
-                    // Recreate activity to apply locale change fully, or manage recomposition
                     recreate()
                 }
 
                 if (allPermissionsGranted) {
                     val navController = rememberNavController()
-                    NavHost(navController = navController, startDestination = "homeScreen") {
+                    NavHost(
+                        navController = navController,
+                        startDestination = "homeScreen"
+                    ) {
                         composable("homeScreen") {
                             HomeScreen(
-                                onNavigateToDiseaseDetection = { navController.navigate("diseaseDetectionScreen") },
+                                onNavigateToDiseaseDetection = {
+                                    navController.navigate("diseaseDetectionScreen")
+                                },
                                 onLanguageSelected = onLanguageSelected,
-                                currentLanguage = getLanguagePreference(context)
+                                currentLanguage = getLanguagePreference(context),
+                                onNavigateToCropPrices = {
+                                    navController.navigate("cropPricesScreen")
+                                }
                             )
                         }
                         composable("diseaseDetectionScreen") {
-                            DiseaseDetectionScreen(onBackClicked = { navController.popBackStack() })
+                            DiseaseDetectionScreen(
+                                onBackClicked = { navController.popBackStack() }
+                            )
+                        }
+                        composable("cropPricesScreen") {
+                            CropPricesScreen(
+                                onBackClicked = { navController.popBackStack() },
+                                onNavigateToCropAnalytics = { cropName ->
+                                    navController.navigate("cropAnalyticsScreen/$cropName")
+                                }
+                            )
+                        }
+                        composable(
+                            "cropAnalyticsScreen/{cropName}",
+                            arguments = listOf(
+                                navArgument("cropName") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val cropName =
+                                backStackEntry.arguments?.getString("cropName") ?: "Unknown Crop"
+                            CropAnalyticsScreen(
+                                cropName = cropName,
+                                onBackClicked = { navController.popBackStack() }
+                            )
                         }
                     }
                 } else {

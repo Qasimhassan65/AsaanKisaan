@@ -42,26 +42,25 @@ import java.io.InputStreamReader
 import java.util.Objects
 import kotlin.random.Random // Added for random fallback
 
-// Removed TensorFlow Lite imports
-// import org.tensorflow.lite.DataType
-// import org.tensorflow.lite.support.image.ImageProcessor
-// import org.tensorflow.lite.support.image.TensorImage
-// import org.tensorflow.lite.support.image.ops.ResizeOp
-// import org.tensorflow.lite.support.image.ops.TransformToGrayscaleOp
-// import org.tensorflow.lite.Interpreter
-// import org.tensorflow.lite.support.label.Category
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import android.util.Log
-import kotlinx.coroutines.delay // Added for fake loading state
-// import org.tensorflow.lite.support.common.ops.NormalizeOp
+import kotlinx.coroutines.delay
+import com.example.asaankisaan.ml.PlantDiseaseClassifier
 
 // Data class to hold parsed disease information
 data class DiseaseInfo(
     val englishName: String,
     val romanUrduHindiCommon: String,
     val nextSteps: String
+)
+
+// Data class for prediction results
+data class PredictionResult(
+    val diseaseName: String,
+    val confidence: Float,
+    val diseaseInfo: DiseaseInfo?
 )
 
 // Removed Utility function to load and parse the CSV file
@@ -83,6 +82,17 @@ fun DiseaseDetectionScreen(
     var diseaseDescription by remember { mutableStateOf("Please upload a plant image for detection.") }
     var cropImageUri by remember { mutableStateOf<Uri?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var confidence by remember { mutableStateOf(0f) }
+    var isOffline by remember { mutableStateOf(true) }
+    
+    // Initialize TensorFlow Lite classifier
+    val classifier by remember { mutableStateOf(PlantDiseaseClassifier(context)) }
+    
+    // Test model on initialization
+    LaunchedEffect(Unit) {
+        val modelWorking = classifier.testModel()
+        Log.d("DiseaseDetection", "Model test result: $modelWorking")
+    }
 
     // Hardcoded disease list
     val diseaseList = remember {
@@ -119,28 +129,72 @@ fun DiseaseDetectionScreen(
 
     val coroutineScope = rememberCoroutineScope()
 
-    // Function to process image and update UI - now with fake loading and random result
+    // Convert URI to Bitmap
+    fun uriToBitmap(uri: Uri): Bitmap? {
+        return try {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source)
+        } catch (e: Exception) {
+            Log.e("DiseaseDetection", "Error converting URI to bitmap: ${e.message}")
+            null
+        }
+    }
+    
+    // TensorFlow Lite inference function
+    suspend fun runInference(imageUri: Uri?): PlantDiseaseClassifier.PredictionResult? = withContext(Dispatchers.Default) {
+        try {
+            if (imageUri == null) return@withContext null
+            
+            // Convert URI to Bitmap
+            val bitmap = uriToBitmap(imageUri)
+            if (bitmap == null) {
+                Log.e("DiseaseDetection", "Failed to convert URI to bitmap")
+                return@withContext null
+            }
+            
+            // Run inference using TensorFlow Lite
+            val result = classifier.classifyDisease(bitmap)
+            
+            return@withContext result
+            
+        } catch (e: Exception) {
+            Log.e("DiseaseDetection", "Error in runInference: ${e.message}")
+            return@withContext null
+        }
+    }
+    
+    // Function to process image using TensorFlow Lite
     fun processImageAndPredict(uri: Uri?) {
         cropImageUri = uri
         showResult = true
         isLoading = true
+        
         coroutineScope.launch {
-            // Simulate model processing time
-            delay(5000L) // 5 seconds fake loading
-
-            // Directly pick a random disease from the static list
-            if (diseaseList.isNotEmpty()) {
-                val randomIndex = Random.nextInt(diseaseList.size)
-                val randomDisease = diseaseList[randomIndex]
-                diseaseName = randomDisease.romanUrduHindiCommon
-                diseaseDescription = randomDisease.nextSteps
-                Log.d("DiseaseDetection", "Fake detection triggered: Randomly selected disease: ${randomDisease.englishName}")
-            } else {
-                // Fallback if disease list is empty (should not happen with the hardcoded list)
-                diseaseName = "Unknown Disease"
-                diseaseDescription = "Could not find information for any disease (disease list is empty).".also { Log.e("DiseaseDetection", "FATAL: Disease list is empty.") }
+            try {
+                val result = withContext(Dispatchers.Default) {
+                    runInference(uri)
+                }
+                
+                result?.let { prediction ->
+                    diseaseName = prediction.diseaseInfo?.romanUrduHindiCommon ?: prediction.diseaseName
+                    diseaseDescription = prediction.diseaseInfo?.nextSteps ?: "No specific treatment information available."
+                    confidence = prediction.confidence
+                    isOffline = true
+                    
+                    Log.d("DiseaseDetection", "TFLite prediction: ${prediction.diseaseName} (${(confidence * 100).toInt()}%)")
+                } ?: run {
+                    diseaseName = "Detection Failed"
+                    diseaseDescription = "Could not process the image. Please try again with a clear plant image."
+                    confidence = 0f
+                }
+                
+            } catch (e: Exception) {
+                Log.e("DiseaseDetection", "Error during inference: ${e.message}")
+                diseaseName = "Error"
+                diseaseDescription = "Failed to analyze image: ${e.message}"
+                confidence = 0f
             }
-
+            
             isLoading = false
         }
     }
@@ -323,12 +377,60 @@ fun DiseaseDetectionScreen(
                             Spacer(modifier = Modifier.height(16.dp))
                             Text("Detecting disease...", modifier = Modifier.align(Alignment.CenterHorizontally), color = Color.White)
                         } else {
-                            Text(
-                                text = diseaseName,
-                                color = Color.Red, // Always red as requested
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            // Disease name and confidence
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = diseaseName,
+                                    color = Color.Red, // Always red as requested
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                
+                                // Confidence badge
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (confidence > 0.7f) Color.Green.copy(alpha = 0.8f) 
+                                        else if (confidence > 0.4f) Color(0xFFFFA500).copy(alpha = 0.8f) // Orange color
+                                        else Color.Red.copy(alpha = 0.8f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        text = "${(confidence * 100).toInt()}%",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                            
+                            // Offline indicator
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isOffline) Icons.Default.CloudUpload else Icons.Default.CloudUpload,
+                                    contentDescription = "Status",
+                                    tint = if (isOffline) Color.Green else Color.Red,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isOffline) "Offline Analysis" else "Online Analysis",
+                                    color = if (isOffline) Color.Green else Color.Red,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            
                             Spacer(modifier = Modifier.height(8.dp))
                             // Image preview
                             cropImageUri?.let { uri ->

@@ -15,3 +15,5 @@ val SkyBlue = Color(0xFF87CEEB)
 
 val LightGreen = Color(0xFF90EE90) // Light green from v0 code
 val DarkGreenPrimary = Color(0xFF4CAF50) // Green used for icons and progress
+val FarmlandGreen = Color(0xFF98FB98) // Light green from v0 code for background
+val NeonGreen = Color(0xFF00FF7F) // Green border from v0 code

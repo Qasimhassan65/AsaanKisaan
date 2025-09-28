@@ -42,7 +42,6 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
@@ -58,6 +57,31 @@ dependencies {
 
     // Google Location Services
     implementation("com.google.android.gms:play-services-location:21.0.1")
+
+    // Jetpack Compose Navigation
+    implementation(libs.androidx.navigation.compose)
+
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // TensorFlow Lite for Android (Simplified dependencies)
+//    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+//    implementation("org.tensorflow:tensorflow-lite-gpu:2.17.0") // Commented out to avoid duplicate class issue
+//    implementation("org.tensorflow:tensorflow-lite-support:0.5.0") // Explicitly re-added
+//    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+//    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+
+    // TensorFlow Lite Support library (for NormalizeOp, ResizeOp, TensorImage, etc.)
+//    implementation("org.tensorflow:tensorflow-lite:2.12.0")
+//    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+// TensorFlow Lite Task Vision library (for ImageClassifier, Category, etc.)
+//    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+// (Optional but good to have) Core TensorFlow Lite runtime
+
+    implementation("org.tensorflow:tensorflow-lite:2.11.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -1,3 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AsaanKisaan</string>
+    <!-- App Info Card -->
+    <string name="app_name">Asaan Kisaan</string>
+    <string name="plant_icon_description">Plant Icon</string>
+    <string name="weather_icon_description">Weather Icon</string>
+    <string name="default_temperature">--°C</string>
+    <string name="loading_text">Loading...</string>
+
+    <!-- Language Selector -->
+    <string name="language_english">English</string>
+    <string name="language_urdu">اردو</string>
+    <string name="dropdown_icon_description">Dropdown Arrow</string>
+
+    <!-- Favorite Crops Prices Card -->
+    <string name="favorite_crops_prices_title">Favorite Crops Prices</string>
+    <string name="crop_wheat">Wheat</string>
+    <string name="price_wheat">PKR 3200/40kg</string>
+    <string name="crop_cotton">Cotton</string>
+    <string name="price_cotton">PKR 8500/100kg</string>
+    <string name="crop_rice">Rice</string>
+    <string name="price_rice">PKR 4800/50kg</string>
+
+    <!-- Feature Cards -->
+    <string name="disease_prediction_title">Disease Prediction</string>
+    <string name="disease_prediction_subtitle">Upload crop photo</string>
+    <string name="helpline_title">Helpline</string>
+    <string name="helpline_subtitle">Call Kisaan Expert</string>
+
+    <!-- Bottom Navigation -->
+    <string name="home_icon_description">Home</string>
+    <string name="chat_icon_description">Chat</string>
+    <string name="settings_icon_description">Settings</string>
 </resources>

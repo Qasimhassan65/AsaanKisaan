@@ -2,9 +2,6 @@ package com.example.asaankisaan.ui.homescreen
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.RenderEffect
-import android.graphics.Shader
-import android.os.Build
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,8 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -55,10 +50,15 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
 import android.util.Log // Import for logging
+import androidx.compose.ui.res.stringResource // Import for string resources
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onNavigateToDiseaseDetection: () -> Unit,
+    onLanguageSelected: (String) -> Unit, // New language selection callback
+    currentLanguage: String // Current language code (e.g., "en", "ur")
+) {
     val gradientColors = listOf(
         LightGreen, // Light green
         SkyBlue  // Sky blue
@@ -118,8 +118,6 @@ fun HomeScreen() {
             } else {
                 Log.e("WeatherAppDebug", "Permissions not actually granted despite result callback saying so.")
             }
-        } else {
-            Log.e("WeatherAppDebug", "Location permissions denied by user.")
         }
     }
 
@@ -227,7 +225,7 @@ fun HomeScreen() {
                         // Plant Icon
                         Icon(
                             imageVector = Icons.Default.Eco,
-                            contentDescription = "Plant Icon",
+                            contentDescription = stringResource(R.string.plant_icon_description),
                             modifier = Modifier.size(48.dp),
                             tint = Color.White
                         )
@@ -235,7 +233,7 @@ fun HomeScreen() {
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         Text(
-                            text = "Asaan Kisaan",
+                            text = stringResource(R.string.app_name),
                             color = Color.White,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Medium
@@ -250,78 +248,93 @@ fun HomeScreen() {
                         ) {
                             val temperature = weatherData?.main?.temp?.toInt()
                             Text(
-                                text = if (temperature != null) "$temperature°C" else "--°C",
+                                text = if (temperature != null) "$temperature°C" else stringResource(R.string.default_temperature),
                                 color = Color.Black,
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Icon(
                                 imageVector = weatherData?.weather?.firstOrNull()?.icon?.let { mapWeatherIconToImageVector(it) } ?: Icons.Default.CloudOff,
-                                contentDescription = "Weather",
+                                contentDescription = stringResource(R.string.weather_icon_description),
                                 tint = Color.White,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
                         
                         Text(
-                            text = weatherData?.name ?: "Loading...",
+                            text = weatherData?.name ?: stringResource(R.string.loading_text),
                             color = Color.Black.copy(alpha = 0.7f),
                             fontSize = 14.sp
                         )
                     }
                 }
                 
-                // Language Selector
+                // Language Selector (Replaced with ExposedDropdownMenuBox)
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color.White.copy(alpha = 0.2f)
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "English",
-                                color = Color.Black,
-                                fontSize = 14.sp
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Dropdown",
-                                tint = Color.Black,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                    var expanded by remember { mutableStateOf(false) }
+                    val languageOptions = listOf("en", "ur")
+                    val displayLanguage = when (currentLanguage) {
+                        "en" -> stringResource(R.string.language_english)
+                        "ur" -> stringResource(R.string.language_urdu)
+                        else -> stringResource(R.string.language_english) // Default to English display
                     }
-                    
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color.White.copy(alpha = 0.2f)
-                        ),
-                        shape = RoundedCornerShape(16.dp)
+
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = {
+                            expanded = !expanded
+                        },
+                        modifier = Modifier.width(IntrinsicSize.Max) // Make dropdown content width fit
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Card(
+                            modifier = Modifier
+                                .menuAnchor()
+                                .width(IntrinsicSize.Max),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.White.copy(alpha = 0.2f)
+                            ),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            Text(
-                                text = "اردو کسان ٹولز",
-                                color = Color.Black,
-                                fontSize = 14.sp
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Dropdown",
-                                tint = Color.Black,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = displayLanguage,
+                                    color = Color.Black,
+                                    fontSize = 14.sp
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.dropdown_icon_description),
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            languageOptions.forEach { langCode ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(text = when (langCode) {
+                                            "en" -> stringResource(R.string.language_english)
+                                            "ur" -> stringResource(R.string.language_urdu)
+                                            else -> ""
+                                        })
+                                    },
+                                    onClick = {
+                                        onLanguageSelected(langCode)
+                                        expanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -341,7 +354,7 @@ fun HomeScreen() {
                         .padding(20.dp)
                 ) {
                     Text(
-                        text = "Favorite Crops Prices",
+                        text = stringResource(R.string.favorite_crops_prices_title),
                         color = Color.Black,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold
@@ -351,8 +364,8 @@ fun HomeScreen() {
                     
                     // Wheat Price
                     CropPriceRow(
-                        cropName = "Wheat",
-                        price = "PKR 3200/40kg",
+                        cropName = stringResource(R.string.crop_wheat),
+                        price = stringResource(R.string.price_wheat),
                         showProgress = false
                     )
                     
@@ -360,8 +373,8 @@ fun HomeScreen() {
                     
                     // Cotton Price with Progress
                     CropPriceRow(
-                        cropName = "Cotton",
-                        price = "PKR 8500/100kg",
+                        cropName = stringResource(R.string.crop_cotton),
+                        price = stringResource(R.string.price_cotton),
                         showProgress = true
                     )
                     
@@ -369,8 +382,8 @@ fun HomeScreen() {
                     
                     // Rice Price
                     CropPriceRow(
-                        cropName = "Rice",
-                        price = "PKR 4800/50kg",
+                        cropName = stringResource(R.string.crop_rice),
+                        price = stringResource(R.string.price_rice),
                         showProgress = false
                     )
                 }
@@ -385,16 +398,17 @@ fun HomeScreen() {
                 FeatureCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Default.BugReport,
-                    title = "Disease Prediction",
-                    subtitle = "Upload crop photo"
+                    title = stringResource(R.string.disease_prediction_title),
+                    subtitle = stringResource(R.string.disease_prediction_subtitle),
+                    onClick = onNavigateToDiseaseDetection // Call the lambda here
                 )
                 
                 // Helpline Card
                 FeatureCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Default.Phone,
-                    title = "Helpline",
-                    subtitle = "Call Kisaan Expert"
+                    title = stringResource(R.string.helpline_title),
+                    subtitle = stringResource(R.string.helpline_subtitle)
                 )
             }
             
@@ -416,19 +430,19 @@ fun HomeScreen() {
                 ) {
                     Icon(
                         imageVector = Icons.Default.Home,
-                        contentDescription = "Home",
+                        contentDescription = stringResource(R.string.home_icon_description),
                         tint = DarkGreenPrimary,
                         modifier = Modifier.size(28.dp)
                     )
                     Icon(
                         imageVector = Icons.Default.ChatBubble,
-                        contentDescription = "Chat",
+                        contentDescription = stringResource(R.string.chat_icon_description),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp)
                     )
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
+                        contentDescription = stringResource(R.string.settings_icon_description),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp)
                     )
@@ -494,10 +508,11 @@ fun FeatureCard(
     modifier: Modifier = Modifier,
     icon: ImageVector,
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: (() -> Unit)? = null // Added optional onClick lambda
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.cardColors(
             containerColor = Color.White.copy(alpha = 0.2f)
         ),
@@ -540,6 +555,11 @@ fun FeatureCard(
 @Composable
 fun HomeScreenPreview() {
     MaterialTheme {
-        HomeScreen()
+        // Providing placeholder lambdas and a default language for preview
+        HomeScreen(
+            onNavigateToDiseaseDetection = {},
+            onLanguageSelected = {},
+            currentLanguage = "en"
+        )
     }
 }

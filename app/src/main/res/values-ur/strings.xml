@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Info Card -->
+    <string name="app_name">آسان کسان</string>
+    <string name="plant_icon_description">پودے کا آئیکن</string>
+    <string name="weather_icon_description">موسم کا آئیکن</string>
+    <string name="default_temperature">--°C</string>
+    <string name="loading_text">لوڈنگ ہو رہی ہے...</string>
+
+    <!-- Language Selector -->
+    <string name="language_english">انگلش</string>
+    <string name="language_urdu">اردو</string>
+    <string name="dropdown_icon_description">ڈراپ ڈاؤن تیر</string>
+
+    <!-- Favorite Crops Prices Card -->
+    <string name="favorite_crops_prices_title">پسندیدہ فصلوں کی قیمتیں</string>
+    <string name="crop_wheat">گندم</string>
+    <string name="price_wheat">پی کے آر 3200/40 کلو</string>
+    <string name="crop_cotton">کپاس</string>
+    <string name="price_cotton">پی کے آر 8500/100 کلو</string>
+    <string name="crop_rice">چاول</string>
+    <string name="price_rice">پی کے آر 4800/50 کلو</string>
+
+    <!-- Feature Cards -->
+    <string name="disease_prediction_title">بیماری کی پیش گوئی</string>
+    <string name="disease_prediction_subtitle">فصل کی تصویر اپ لوڈ کریں</string>
+    <string name="helpline_title">ہیلپ لائن</string>
+    <string name="helpline_subtitle">کسان ماہر کو کال کریں</string>
+
+    <!-- Bottom Navigation -->
+    <string name="home_icon_description">ہوم</string>
+    <string name="chat_icon_description">چیٹ</string>
+    <string name="settings_icon_description">ترتیبات</string>
+</resources>

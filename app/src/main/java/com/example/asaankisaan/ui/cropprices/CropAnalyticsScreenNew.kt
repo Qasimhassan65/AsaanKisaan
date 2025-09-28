@@ -76,7 +76,7 @@ fun CropAnalyticsScreen(
             
             // Convert to chart data (limit to last 50 points for performance)
             chartData = priceHistory.takeLast(50).map { 
-                PricePoint(it.date, it.price, it.basePrice, it.inflationRate) 
+                PricePoint(it.date, it.price) 
             }
             
             // Get recent history for display
@@ -378,16 +378,16 @@ fun PriceChart(
             val y = canvasHeight - padding - ((point.price - minPrice) / priceRange) * (canvasHeight - 2 * padding)
             
             if (index == 0) {
-                path.moveTo(x.toFloat(), y.toFloat())
-                fillPath.moveTo(x.toFloat(), (canvasHeight - padding).toFloat())
-                fillPath.lineTo(x.toFloat(), y.toFloat())
+                path.moveTo(x, y)
+                fillPath.moveTo(x, canvasHeight - padding)
+                fillPath.lineTo(x, y)
             } else {
-                path.lineTo(x.toFloat(), y.toFloat())
-                fillPath.lineTo(x.toFloat(), y.toFloat())
+                path.lineTo(x, y)
+                fillPath.lineTo(x, y)
             }
         }
         
-        fillPath.lineTo((canvasWidth - padding).toFloat(), (canvasHeight - padding).toFloat())
+        fillPath.lineTo(canvasWidth - padding, canvasHeight - padding)
         fillPath.close()
         
         // Draw filled area
@@ -414,7 +414,7 @@ fun PriceChart(
             drawCircle(
                 color = Color.White,
                 radius = 4.dp.toPx(),
-                center = Offset(x.toFloat(), y.toFloat())
+                center = Offset(x, y)
             )
         }
         
@@ -429,7 +429,7 @@ fun PriceChart(
             // Min price
             canvas.nativeCanvas.drawText(
                 String.format("%.0f", minPrice),
-                padding.toFloat(),
+                padding,
                 canvasHeight - padding + 30.dp.toPx(),
                 paint
             )
@@ -437,7 +437,7 @@ fun PriceChart(
             // Max price
             canvas.nativeCanvas.drawText(
                 String.format("%.0f", maxPrice),
-                padding.toFloat(),
+                padding,
                 padding + 20.dp.toPx(),
                 paint
             )

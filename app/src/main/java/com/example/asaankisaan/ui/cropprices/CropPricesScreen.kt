@@ -4,31 +4,57 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.asaankisaan.data.model.CropPriceData
+import com.example.asaankisaan.data.model.AVAILABLE_CROPS
+import com.example.asaankisaan.data.repository.CropPriceRepository
 import com.example.asaankisaan.ui.theme.FarmlandGreen
 import com.example.asaankisaan.ui.theme.NeonGreen
 import com.example.asaankisaan.ui.theme.SkyBlue
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CropPricesScreen(
     onBackClicked: () -> Unit,
-    onNavigateToCropAnalytics: (String) -> Unit // New callback for navigation
+    onNavigateToCropAnalytics: (String) -> Unit, // New callback for navigation
+    userLatitude: Double = 31.5204, // Default to Lahore
+    userLongitude: Double = 74.3587
 ) {
+    val context = LocalContext.current
+    val repository = remember { CropPriceRepository(context) }
+    val coroutineScope = rememberCoroutineScope()
+    
+    var cropData by remember { mutableStateOf<List<CropPriceData>>(emptyList()) }
+    var currentLocation by remember { mutableStateOf("Lahore") }
+    var isLoading by remember { mutableStateOf(true) }
+    
+    LaunchedEffect(Unit) {
+        coroutineScope.launch {
+            isLoading = true
+            repository.loadCropData()
+            currentLocation = repository.getClosestLocation(userLatitude, userLongitude)
+            isLoading = false
+        }
+    }
+    
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             SkyBlue, // #87CEEB
@@ -66,14 +92,21 @@ fun CropPricesScreen(
                     )
                 }
                 
-                Text(
-                    text = "Crop Prices",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Crop Prices",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "📍 $currentLocation",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 12.sp
+                    )
+                }
                 
                 IconButton(onClick = { /* TODO: Handle menu */ }) {
                     Icon(
@@ -88,44 +121,42 @@ fun CropPricesScreen(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Crop Cards
-        CropPriceCard(
-            cropName = "Wheat",
-            price = "PKR 3,200 per 40kg",
-            trendColor = NeonGreen, // Using NeonGreen for trend color
-            trendIcon = "↑",
-            onClick = { onNavigateToCropAnalytics("Wheat") }
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        CropPriceCard(
-            cropName = "Rice",
-            price = "PKR 2,800 per 40kg",
-            trendColor = Color.Red, // Using Red for downward trend
-            trendIcon = "↓",
-            onClick = { onNavigateToCropAnalytics("Rice") }
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        CropPriceCard(
-            cropName = "Corn",
-            price = "PKR 2,500 per 40kg",
-            trendColor = Color.White, // Using White for no change
-            trendIcon = "=",
-            onClick = { onNavigateToCropAnalytics("Corn") }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        CropPriceCard(
-            cropName = "Cotton",
-            price = "PKR 2,500 per 40kg",
-            trendColor = Color.White,
-            trendIcon = "=",
-            onClick = { onNavigateToCropAnalytics("Cotton") }
-        )
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        } else {
+            // Dynamic Crop Cards from CSV data
+            val currentPrices = repository.getCurrentPricesForLocation(currentLocation)
+            
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(AVAILABLE_CROPS) { crop ->
+                    val cropPrice = currentPrices[crop.name]
+                    if (cropPrice != null) {
+                        val trend = repository.getPriceTrend(crop.name, currentLocation)
+                        val trendColor = when (trend) {
+                            "↑" -> NeonGreen
+                            "↓" -> Color.Red
+                            else -> Color.White
+                        }
+                        
+                        CropPriceCard(
+                            cropName = crop.displayName,
+                            price = "PKR ${String.format("%.0f", cropPrice.predictedPricePkrPer40kg)} per 40kg",
+                            trendColor = trendColor,
+                            trendIcon = trend,
+                            icon = crop.icon,
+                            onClick = { onNavigateToCropAnalytics(crop.name) }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -135,6 +166,7 @@ fun CropPriceCard(
     price: String,
     trendColor: Color,
     trendIcon: String,
+    icon: String = "🌾",
     onClick: () -> Unit // Added onClick lambda
 ) {
     Card(
@@ -169,13 +201,7 @@ fun CropPriceCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = when(cropName) {
-                        "Wheat" -> "🌾"
-                        "Rice" -> "🍚" // Changed to reflect rice icon in image
-                        "Corn" -> "🌽"
-                        "Cotton" -> "\uD83C\uDF32" // Using unicode for cotton plant icon
-                        else -> "🌾"
-                    },
+                    text = icon,
                     fontSize = 20.sp
                 )
             }

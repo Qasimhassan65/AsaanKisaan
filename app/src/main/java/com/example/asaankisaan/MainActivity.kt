@@ -32,6 +32,13 @@ import com.example.asaankisaan.ui.cropprices.CropPricesScreen
 import com.example.asaankisaan.ui.cropprices.CropAnalyticsScreen
 import com.example.asaankisaan.ui.theme.AsaanKisaanTheme
 import java.util.Locale
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationRequest
+import android.os.Looper
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -88,6 +95,9 @@ class MainActivity : ComponentActivity() {
             AsaanKisaanTheme {
                 val context = LocalContext.current
                 var allPermissionsGranted by remember { mutableStateOf(false) }
+                var userLatitude by remember { mutableStateOf(31.5204) } // Default to Lahore
+                var userLongitude by remember { mutableStateOf(74.3587) }
+                val coroutineScope = rememberCoroutineScope()
 
                 val permissionsToRequest = mutableListOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -116,6 +126,28 @@ class MainActivity : ComponentActivity() {
 
                     if (currentPermissions) {
                         allPermissionsGranted = true
+                        // Get location if permissions are granted
+                        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                            val locationRequest = LocationRequest.Builder(
+                                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 10000
+                            )
+                                .setWaitForAccurateLocation(false)
+                                .setMinUpdateIntervalMillis(5000)
+                                .setMaxUpdateDelayMillis(10000)
+                                .build()
+
+                            val locationCallback = object : LocationCallback() {
+                                override fun onLocationResult(locationResult: LocationResult) {
+                                    locationResult.lastLocation?.let { location ->
+                                        userLatitude = location.latitude
+                                        userLongitude = location.longitude
+                                        fusedLocationClient.removeLocationUpdates(this)
+                                    }
+                                }
+                            }
+                            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+                        }
                     } else {
                         requestPermissionLauncher.launch(permissionsToRequest)
                     }
@@ -155,7 +187,9 @@ class MainActivity : ComponentActivity() {
                                 onBackClicked = { navController.popBackStack() },
                                 onNavigateToCropAnalytics = { cropName ->
                                     navController.navigate("cropAnalyticsScreen/$cropName")
-                                }
+                                },
+                                userLatitude = userLatitude,
+                                userLongitude = userLongitude
                             )
                         }
                         composable(
@@ -168,7 +202,9 @@ class MainActivity : ComponentActivity() {
                                 backStackEntry.arguments?.getString("cropName") ?: "Unknown Crop"
                             CropAnalyticsScreen(
                                 cropName = cropName,
-                                onBackClicked = { navController.popBackStack() }
+                                onBackClicked = { navController.popBackStack() },
+                                userLatitude = userLatitude,
+                                userLongitude = userLongitude
                             )
                         }
                     }
